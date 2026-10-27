@@ -132,3 +132,44 @@ Desafios (não obrigatórios):
  * é possível construir a solução inteira sem utilizar nenhum if. Só não pode usar *break* e *continue*! 
  * como garantir que 2 transações disparadas ao mesmo tempo não causem problemas relacionados à concorrência?
 Exemplo: dado que um cartão possua R$10.00 de saldo. Se fizermos 2 transações de R$10.00 ao mesmo tempo, em instâncias diferentes da aplicação, como o sistema deverá se comportar?
+
+---
+
+# Solução
+
+## Como executar
+
+```
+docker compose -f docker/docker-compose.yml up -d   # MongoDB
+./mvnw spring-boot:run                              # aplicação em http://localhost:8080
+./mvnw test                                         # testes (precisam de Docker, via Testcontainers)
+```
+
+Requer Java 21. A URI do banco pode ser sobrescrita pela variável `MONGODB_URI`.
+
+## Organização
+
+```
+cartao/      Cartao, CartaoRepository (MongoTemplate), CartaoService, CartaoController
+transacao/   TransacaoService (regras de autorização), TransacaoController, MotivoRecusa
+config/      MongoConfig (BigDecimal como Decimal128) e ApiExceptionHandler (exceção -> HTTP)
+```
+
+## Decisões
+
+* **MongoDB**: o cartão é um único documento, e o número do cartão é o `_id`. O MySQL do compose foi comentado.
+* **Concorrência**: o débito é um `findAndModify` atômico com filtro `saldo >= valor` e `$inc`. A checagem de saldo e o
+  decremento acontecem juntos no banco, sem transações nem locks, e isso vale entre instâncias diferentes da aplicação.
+  Com R$10,00 de saldo e duas transações de R$10,00 simultâneas, uma é aprovada e a outra recebe `SALDO_INSUFICIENTE`.
+  Há um teste com 100 requisições concorrentes (`MiniAutorizadorApiTest`).
+* **Criação duplicada**: garantida pelo índice único do `_id` (`DuplicateKeyException` -> 422), sem "verificar e depois inserir".
+* **Sem `if`/`break`/`continue`**: fluxo de decisão com `Optional`, exceções de negócio e `@RestControllerAdvice`.
+* **Saldo como `Decimal128`**: o `BigDecimal` padrão é gravado como String, que não aceita `$inc`.
+
+## Suposições
+
+* A senha é guardada com hash BCrypt, mas a resposta de criação a devolve em texto, como exige o contrato.
+* As regras são avaliadas na ordem: cartão existe, senha correta, saldo suficiente.
+* O valor da transação deve ser positivo; corpos inválidos retornam 400 (fora do contrato original).
+* O saldo inicial é R$500,00 e transações não são persistidas, conforme o enunciado.
+* `docker/scripts/init.js` é um link simbólico para `init.users`, que o compose já referenciava.
