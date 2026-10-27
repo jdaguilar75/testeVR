@@ -141,11 +141,11 @@ Exemplo: dado que um cartão possua R$10.00 de saldo. Se fizermos 2 transações
 
 ```
 docker compose -f docker/docker-compose.yml up -d   # MongoDB
-./mvnw spring-boot:run                              # aplicação em http://localhost:8080
-./mvnw test                                         # testes (precisam de Docker, via Testcontainers)
+mvn spring-boot:run                                 # aplicação em http://localhost:8080
+mvn test                                             # testes (precisam de Docker, via Testcontainers)
 ```
 
-Requer Java 21. A URI do banco pode ser sobrescrita pela variável `MONGODB_URI`.
+Requer Java 21 e Maven 3.6.3+. A URI do banco pode ser sobrescrita pela variável `MONGODB_URI`.
 
 ## Organização
 
